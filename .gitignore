@@ -1,0 +1,17 @@
+# Editors
+.vs/
+.vscode/
+
+# Project configuration
+PDFScanner/Properties/
+
+# Project output
+PDFScanner/output/
+
+# Images
+PDFScanner/wwwroot/images/
+
+# Binary output
+obj/
+PDFScanner/bin/
+PDFScanner/obj/

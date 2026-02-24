@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello Button</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+        }
+
+        main {
+            margin: auto;
+            text-align: center;
+        }
+
+        button {
+            padding: 0.6rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        #status {
+            margin-top: 0.75rem;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        #spinner {
+            display: none;
+            margin-top: 1rem;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        #preview {
+            max-width: 300px
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://unpkg.com/cropperjs@2.1.0/dist/cropper.min.js"></script>
+    <main>
+        <div id="main-view" class="view active">
+
+            <cropper-canvas id="cropper-canvas" background
+                            style="display: none; margin-top: 100px; margin-bottom: 100px; margin-left: 100px; margin-right: 100px;">
+                <cropper-image id="cropper-image"></cropper-image>
+                <cropper-shade id="shade" hidden></cropper-shade>
+                <!-- <cropper-handle action="select" plain></cropper-handle> -->
+                <cropper-selection id="selection" initial-coverage="1.0" resizable>
+                    <!-- <cropper-grid role="grid" covered></cropper-grid> -->
+                    <!-- <cropper-crosshair centered></cropper-crosshair> -->
+                    <cropper-handle action="move" theme-color="rgba(255, 255, 255, 0)"></cropper-handle>
+                    <cropper-handle action="n-resize"></cropper-handle>
+                    <cropper-handle action="e-resize"></cropper-handle>
+                    <cropper-handle action="s-resize"></cropper-handle>
+                    <cropper-handle action="w-resize"></cropper-handle>
+                    <cropper-handle action="ne-resize"></cropper-handle>
+                    <cropper-handle action="nw-resize"></cropper-handle>
+                    <cropper-handle action="se-resize"></cropper-handle>
+                    <cropper-handle action="sw-resize"></cropper-handle>
+                </cropper-selection>
+            </cropper-canvas>
+            <!--<img id="image" style="display:none; margin-left:auto; margin-right:auto; display:block"></img>-->
+            <!-- <cropper-viewer id="cropper-viewer" selection="#selection" style="display: none;"></cropper-viewer> -->
+            <div id="spinner"></div>
+            <p></p>
+            <div style="border-width:2px;border-color:black;border-style:solid">
+                <button id="scan1" class="fakeScan">Scan (1)</button>
+                <button id="scan2" class="fakeScan">Scan (2)</button>
+                <button id="intel" class="fakeScan">Intel</button>
+                <button id="lenovo" class="fakeScan">Lenovo</button>
+                <button id="rice" class="fakeScan">Rice</button>
+            </div>
+            <button id="scanBtn">Scan</button>
+            <button id="approveBtn" disabled="true">Approve</button>
+            <button id="finishBtn">Finish</button>
+            <div id="status"></div>
+        </div>
+        <div id="crop-view" class="view">
+        </div>
+    </main>
+    <script>
+        my__cropper___image = document.getElementById('cropper-image');
+        // my__cropper___image.$center();
+        // my__cropper___image.translatable = false;
+        shade = document.getElementById('shade');
+        document.querySelector('#selection').addEventListener('change', function (event) {
+            shade.hidden = false;
+            shade.$change(event.detail.x, event.detail.y, event.detail.width, event.detail.height);
+        });
+    </script>
+    <script>
+        const scanBtn = document.getElementById('scanBtn');
+        const finishBtn = document.getElementById('finishBtn');
+        const status = document.getElementById('status');
+        const spinner = document.getElementById('spinner');
+        //const resultImage = document.getElementById('image');
+        const approveBtn = document.getElementById('approveBtn');
+        // my__cropper___image.translatable = false;
+
+        approveBtn.addEventListener('click', async () => {
+            //resultImage.src = "";
+            current_image = null;
+
+            approveBtn.disabled = true;
+
+            try {
+                canvas = await document.querySelector('#selection').$toCanvas();
+                console.log(`canvas: ${canvas}`);
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'cropped.bmp');
+
+                    const res = await fetch('/approve', {
+                        method: "POST", body: formData,
+                        //headers: { 'Content-Type': 'multipart/form-data' },
+
+                    });
+                    if (!res.ok) throw new Error('upload failed');
+                })
+            //    if (image_blob) {
+            //        const formData = new FormData();
+            //        formData.append('file', image_blob, 'cropped.bmp');
+
+            //        const res = await fetch('/approve', { method: 'POST', body: formData });
+
+            //        if (!res.ok) throw new Error('Upload failed');
+            //    } else {
+            //        const res = await fetch("/approve", { method: 'POST', body: new FormData() });
+            //        if (!res.ok) throw new Error('Post failed');
+            //    }
+            } catch (err) {
+
+                status.textContent = 'Error: ' + err.message;
+            }
+
+            image_blob = null;
+        });
+
+        const mainView = document.getElementById('main-view');
+        const cropView = document.getElementById('crop-view');
+
+        function init_cropper(image, width, height) {
+            console.log(`init_cropper: width:height = ${width}:${height}`);
+            shade.$change(0, 0, width, height);
+            document.getElementById('selection').$change(0, 0, width, height);
+            my__cropper___image.src = image;
+
+            document.getElementById('cropper-canvas').style.display = 'block';
+            document.getElementById('cropper-canvas').style.width = `${width}px`;
+            document.getElementById('cropper-canvas').style.height = `${height}px`;
+
+            // document.getElementById('cropper-viewer').style.display = 'block';
+            // document.getElementById('cropper-viewer').style.width = `${resultImage.width}px`;
+            // document.getElementById('cropper-viewer').style.height = `${resultImage.height}px`;
+
+            // document.getElementById('shade').$change(0, 0, 400, 225);
+            // document.getElementById('selection').$change(0, 0, 400, 225);
+        }
+
+        var image_blob = null;
+
+        var current_image = null;
+        var img;
+
+        function handleImage(data, width, height) {
+            const url = URL.createObjectURL(data);
+
+            current_image = url;
+            init_cropper(url, width, height);
+        }
+
+        async function handleRes(res) {
+            if (!res.ok) {
+                throw new Error('Request failed: ' + res.status);
+            }
+
+            const data = await res.blob();
+            var bmp = await createImageBitmap(data);
+            console.log("scan height:", bmp.height, "scan width:", bmp.width);
+            handleImage(data, bmp.width, bmp.height);
+
+            console.log("ENABLE");
+            approveBtn.disabled = false;
+            console.log("ENABLED");
+        }
+
+        scanBtn.addEventListener('click', async () => {
+            spinner.style.display = 'inline-block';
+            status.textContent = 'Waiting for scan...';
+
+            try {
+                const res = await fetch('/scan', { method: 'POST' });
+                handleRes(res);
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            } finally {
+                spinner.style.display = 'none';
+                status.textContent = null;
+            }
+        });
+
+        function addListener(btn) {
+            btn.addEventListener('click', async () => {
+                try {
+                    const res = await fetch('/fakeScan', { method: 'POST', headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: btn.id }) });
+                    handleRes(res);
+                } catch (err) {
+                    status.textContent = 'Error: ' + err.message;
+                }
+            })
+        }
+
+        for (btn of document.getElementsByClassName('fakeScan')) {
+            addListener(btn);
+        }
+
+        finishBtn.addEventListener('click', async () => {
+            try {
+                const name = prompt('Enter file name:');
+                if (!name) {
+                    status.textContent = "No name entered.";
+                    return;
+                }
+
+                const res = await fetch('/finish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (!res.ok) throw new Error('Request failed: ' + res.status);
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+
+</html>
