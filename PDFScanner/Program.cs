@@ -64,6 +64,15 @@ internal class SessionState
     private List<Image> images = [];
 }
 
+
+class NoScanner : IScanner
+{
+    protected override Bitmap? ScanPageUnsafe()
+    {
+        throw new NotImplementedException();
+    }
+}
+
 internal class Program
 {
     private static void Main(string[] args)
@@ -92,7 +101,8 @@ internal class Program
         //var images = new List<Bitmap>();
 
         var state = new SessionState();
-        var scanner = new Scanner();
+        //var scanner = new Scanner();
+        var scanner = new NoScanner();  // TODO revert
 
         // Endpoint that prints to stdout
         app.MapPost("/scan", async (HttpContext context) =>

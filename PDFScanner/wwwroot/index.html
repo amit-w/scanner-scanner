@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hello Button</title>
     <style>
+/*TODO remove unnecessary bits*/
         body {
             font-family: system-ui, sans-serif;
             display: flex;
@@ -69,16 +70,16 @@
     <script src="https://unpkg.com/cropperjs@2.1.0/dist/cropper.min.js"></script>
     <main>
         <div id="main-view" class="view active">
-
+<!--TODO style (except for display:none) should be in the CSS-->
             <cropper-canvas id="cropper-canvas" background
-                            style="display: none; margin-top: 100px; margin-bottom: 100px; margin-left: 100px; margin-right: 100px;">
+                            style="display: none; margin-top: 10px; margin-bottom: 10px; margin-left: 10px; margin-right: 10px;">
                 <cropper-image id="cropper-image"></cropper-image>
-                <cropper-shade id="shade" hidden></cropper-shade>
+                <cropper-shade id="shade"></cropper-shade>
                 <!-- <cropper-handle action="select" plain></cropper-handle> -->
-                <cropper-selection id="selection" initial-coverage="1.0" resizable>
+                <cropper-selection id="selection" initial-coverage="1.0" resizable outlined>
                     <!-- <cropper-grid role="grid" covered></cropper-grid> -->
                     <!-- <cropper-crosshair centered></cropper-crosshair> -->
-                    <cropper-handle action="move" theme-color="rgba(255, 255, 255, 0)"></cropper-handle>
+                    <!--<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0)"></cropper-handle>-->
                     <cropper-handle action="n-resize"></cropper-handle>
                     <cropper-handle action="e-resize"></cropper-handle>
                     <cropper-handle action="s-resize"></cropper-handle>
@@ -101,11 +102,13 @@
                 <button id="rice" class="fakeScan">Rice</button>
             </div>
             <button id="scanBtn">Scan</button>
+            <button id="cropBtn" disabled="true">Crop</button>
             <button id="approveBtn" disabled="true">Approve</button>
             <button id="finishBtn">Finish</button>
             <div id="status"></div>
         </div>
         <div id="crop-view" class="view">
+            <button id="doCropBtn">Crop</button>
         </div>
     </main>
     <script>
@@ -124,8 +127,15 @@
         const status = document.getElementById('status');
         const spinner = document.getElementById('spinner');
         //const resultImage = document.getElementById('image');
+        const cropBtn = document.getElementById('cropBtn');
+        const doCropBtn = document.getElementById('doCropBtn');
         const approveBtn = document.getElementById('approveBtn');
         // my__cropper___image.translatable = false;
+        const cropperCanvas = document.getElementById('cropper-canvas');
+
+        // Monkey-patching hack to enable scrolling over the image
+        cropperCanvas.removeEventListener('wheel', cropperCanvas.$onWheel, { capture: true });
+        cropperCanvas.$onWheel = null;
 
         approveBtn.addEventListener('click', async () => {
             //resultImage.src = "";
@@ -134,30 +144,17 @@
             approveBtn.disabled = true;
 
             try {
-                canvas = await document.querySelector('#selection').$toCanvas();
-                console.log(`canvas: ${canvas}`);
-                canvas.toBlob(async (blob) => {
+                if (image_blob) {
                     const formData = new FormData();
-                    formData.append('file', blob, 'cropped.bmp');
+                    formData.append('file', image_blob, 'cropped.bmp');
 
-                    const res = await fetch('/approve', {
-                        method: "POST", body: formData,
-                        //headers: { 'Content-Type': 'multipart/form-data' },
+                    const res = await fetch('/approve', { method: 'POST', body: formData });
 
-                    });
-                    if (!res.ok) throw new Error('upload failed');
-                })
-            //    if (image_blob) {
-            //        const formData = new FormData();
-            //        formData.append('file', image_blob, 'cropped.bmp');
-
-            //        const res = await fetch('/approve', { method: 'POST', body: formData });
-
-            //        if (!res.ok) throw new Error('Upload failed');
-            //    } else {
-            //        const res = await fetch("/approve", { method: 'POST', body: new FormData() });
-            //        if (!res.ok) throw new Error('Post failed');
-            //    }
+                    if (!res.ok) throw new Error('Upload failed');
+                } else {
+                    const res = await fetch("/approve", { method: 'POST', body: new FormData() });
+                    if (!res.ok) throw new Error('Post failed');
+                }
             } catch (err) {
 
                 status.textContent = 'Error: ' + err.message;
@@ -187,40 +184,120 @@
             // document.getElementById('selection').$change(0, 0, 400, 225);
         }
 
+        cropBtn.addEventListener('click', () => {
+            mainView.classList.remove('active');
+            cropView.classList.add('active');
+
+        });
+
         var image_blob = null;
+
+        doCropBtn.addEventListener('click', async () => {
+
+            canvas = await document.querySelector('#selection').$toCanvas();
+            console.log(`canvas: ${canvas}`);
+            canvas.toBlob((blob) => {
+                image_blob = blob;
+                const url = URL.createObjectURL(image_blob);
+                //resultImage.src = url;
+
+                cropView.classList.remove('active');
+                mainView.classList.add('active');
+            }, 'image/png');
+
+        })
+
+        // cropBtn.addEventListener('click', async () => {
+        //     const cropper = new Cropper.CropperCanvas(resultImage, { apectRatio: 1, viewMode: 1 });
+
+        //     // cropper.getCroppedCanvas().toBlob(async (blob) => {
+        //     //     const formData = new FormData();
+        //     //     formData.append('file', blob, 'cropped.png');
+
+        //     //     try {
+        //     //         const res = await fetch('/upload', {
+        //     //             method: 'POST',
+        //     //             body: formData
+        //     //         });
+        //     //         if (!res.ok) throw new Error('upload failed');
+        //     //     } catch (err) {
+        //     //         status.textContent = 'Error: ' + err.message;
+        //     //     }
+        //     // })
+        // })
 
         var current_image = null;
         var img;
 
-        function handleImage(data, width, height) {
+        function handleImage(data) {
             const url = URL.createObjectURL(data);
 
             current_image = url;
-            init_cropper(url, width, height);
+            var lImg = new Image();
+            lImg.onload = () => {
+                const margin = 20;
+                const maxWidth = document.documentElement.clientWidth - margin;
+                console.log("maxWidth: ", maxWidth);
+                const scale = Math.min(1, maxWidth / lImg.naturalWidth);
+                const width = lImg.naturalWidth * scale;
+                const height = lImg.naturalWidth * scale;
+                console.log('handleImage::onload: width:', width, 'height:', height);
+
+                init_cropper(url, width, height);
+            }
+            lImg.src = url;
+            //resultImage.onload = () => {
+            //    init_cropper(url);
+
+            //    resultImage.onload = null;
+            //    cropBtn.disabled = false;
+            //    approveBtn.disabled = false;
+            //};
+            //resultImage.src = url;
+            //resultImage.style.display = 'block';
+
         }
 
-        async function handleRes(res) {
-            if (!res.ok) {
-                throw new Error('Request failed: ' + res.status);
-            }
+        function addListener(btn) {
+            btn.addEventListener('click', async () => {
+                //resultImage.src = "";
 
-            const data = await res.blob();
-            var bmp = await createImageBitmap(data);
-            console.log("scan height:", bmp.height, "scan width:", bmp.width);
-            handleImage(data, bmp.width, bmp.height);
+                try {
+                    const res = await fetch('/fakeScan', { method: 'POST', headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: btn.id }) });
+                    if (!res.ok) {
+                        throw new Error('Request failed: ' + res.status);
+                    }
 
-            console.log("ENABLE");
-            approveBtn.disabled = false;
-            console.log("ENABLED");
+                    const data = await res.blob();
+                    handleImage(data);
+                    //var bmp = await createImageBitmap(data);
+                } catch (err) {
+                    status.textContent = 'Error: ' + err.message;
+                }
+
+            })
+
+        }
+
+        for (btn of document.getElementsByClassName('fakeScan')) {
+            addListener(btn);
         }
 
         scanBtn.addEventListener('click', async () => {
             spinner.style.display = 'inline-block';
             status.textContent = 'Waiting for scan...';
+            //resultImage.src = "";
 
             try {
                 const res = await fetch('/scan', { method: 'POST' });
-                handleRes(res);
+                if (!res.ok) {
+                    throw new Error('Request failed: ' + res.status);
+                }
+
+                const data = await res.blob();
+                //var bmp = await createImageBitmap(data);
+                //console.log("scan height:", bmp.height, "scan width:", bmp.width);
+                handleImage(data);
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
             } finally {
@@ -228,22 +305,6 @@
                 status.textContent = null;
             }
         });
-
-        function addListener(btn) {
-            btn.addEventListener('click', async () => {
-                try {
-                    const res = await fetch('/fakeScan', { method: 'POST', headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName: btn.id }) });
-                    handleRes(res);
-                } catch (err) {
-                    status.textContent = 'Error: ' + err.message;
-                }
-            })
-        }
-
-        for (btn of document.getElementsByClassName('fakeScan')) {
-            addListener(btn);
-        }
-
         finishBtn.addEventListener('click', async () => {
             try {
                 const name = prompt('Enter file name:');

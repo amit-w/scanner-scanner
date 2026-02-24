@@ -4,6 +4,7 @@
 
 # Project configuration
 PDFScanner/Properties/
+PDFScanner/PDFScanner.csproj.user
 
 # Project output
 PDFScanner/output/
