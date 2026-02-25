@@ -15,20 +15,9 @@ record FakeScanName(string FileName);
 
 internal class SessionState
 {
-    //public void AddImage(Image new_image)
-    //{        
-    //    if (currentImage != null)
-    //    {
-    //        images.Add(currentImage);
-    //    }
-
-    //    currentImage = new_image;
-
-    //    System.Diagnostics.Debug.WriteLine($"Add: {images.Count}+1");
-    //}
-
     public void ReplaceImage(Image new_image)
     {
+        Console.WriteLine(":: replace image");
         currentImage = new_image;
 
         System.Diagnostics.Debug.WriteLine($"ReplaceImage: {images.Count}+1");
@@ -37,6 +26,7 @@ internal class SessionState
     public void AddCurrent()
     {
         images.Add(currentImage ?? throw new Exception("no current image"));
+        Console.WriteLine("AddCurrent. Length is now: " + images.Count);
         currentImage = null;
     }
 
@@ -62,6 +52,8 @@ internal class SessionState
 
     private Image? currentImage = null;
     private List<Image> images = [];
+
+    public int Count { get { return images.Count; } }
 }
 
 
@@ -121,13 +113,13 @@ internal class Program
             await SendScan(context, bitmap);
         });
 
-        async Task SendScan(HttpContext context, Bitmap bitmap)
+        static async Task SendScan(HttpContext context, Bitmap bitmap)
         {
             using var ms = new MemoryStream();
             bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
             var rawImage = ms.ToArray();
 
-            state.ReplaceImage(bitmap);
+            // state.ReplaceImage(bitmap);
 
             context.Response.ContentType = "image/json";
             await context.Response.Body.WriteAsync(rawImage);
@@ -138,6 +130,7 @@ internal class Program
 
         app.MapPost("/approve", [Consumes("multipart/form-data")] async (HttpContext context) =>
         {
+            Console.WriteLine(":: approve");
             var form = await context.Request.ReadFormAsync();
             var file = form.Files["file"];
 
@@ -152,22 +145,52 @@ internal class Program
             }
 
             state.AddCurrent();
+            Console.WriteLine(":: /approve");
 
             return Results.Ok();
         });
 
-        app.MapGet("/debug-endpoints", () =>
+        app.MapPost("/finish2", [Consumes("multipart/form-data")] async (HttpContext context) =>
         {
-            var endpoints = app.Services.GetRequiredService<EndpointDataSource>().Endpoints;
-            var info = endpoints.Select(ep =>
-            {
-                var routePattern = (ep as RouteEndpoint)?.RoutePattern?.RawText ?? ep.DisplayName;
-                var metadata = ep.Metadata.Select(m => m.GetType().Name).ToList();
-                return new { routePattern, metadata };
-            });
+            Console.WriteLine(":: finish2");
+            var form = await context.Request.ReadFormAsync();
+            var filename = form["filename"][0] ?? throw new Exception("no filename provided");
 
-            return Results.Json(info);
+            Console.WriteLine("amount of files: " + form.Files.Count);
+
+            using var ms = new MemoryStream();
+            foreach (var file in form.Files)
+            {
+                Console.WriteLine("> file");
+                ms.Seek(0, SeekOrigin.Begin);
+                await file.CopyToAsync(ms);
+
+                var image = new Bitmap(ms);
+                var image2 = new Bitmap(image);
+                // TODO remove this "state" thing
+                state.ReplaceImage(image);
+                state.AddCurrent();
+            }
+            Console.WriteLine(state.Count);
+
+            CreatePdf(state.Take(), filename);
+            Console.WriteLine(":: /finish2");
+            return Results.NoContent();
+
         });
+
+        // app.MapGet("/debug-endpoints", () =>
+        // {
+        //     var endpoints = app.Services.GetRequiredService<EndpointDataSource>().Endpoints;
+        //     var info = endpoints.Select(ep =>
+        //     {
+        //         var routePattern = (ep as RouteEndpoint)?.RoutePattern?.RawText ?? ep.DisplayName;
+        //         var metadata = ep.Metadata.Select(m => m.GetType().Name).ToList();
+        //         return new { routePattern, metadata };
+        //     });
+
+        //     return Results.Json(info);
+        // });
 
         app.MapPost("/finish", (UserInput input) =>
         {
@@ -176,9 +199,9 @@ internal class Program
             return Results.NoContent();
         });
 
-        // TODO use a file from APPDATA or envvar in or something like that to control url
-        //app.Urls.Add("http://192.168.1.199:53353");  // HOME
-        //app.Urls.Add("http://172.22.39.19:53353");
+        // TODO use a file from APPDATA or an envvar or something like that to control url
+        // TODO or even Properties/launch.json - it exists exactly for that
+        //app.Urls.Add("http://...:53353");
         app.Run();
     }
 
@@ -191,7 +214,6 @@ internal class Program
             using var ms = new MemoryStream();
             System.Diagnostics.Debug.WriteLine($"Format: {img.PixelFormat}");
             img.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
-            //img.Save("dbgimg.bmp", System.Drawing.Imaging.ImageFormat.Bmp);
             System.Diagnostics.Debug.WriteLine($"Ok height: {img.Height}");
             ms.Position = 0;
 
@@ -203,7 +225,7 @@ internal class Program
             gfx.DrawImage(xImg, 0, 0, page.Width.Point, heightInPoints);
         }
 
-        // TODO probably do it in a more robust ways
+        // TODO probably do it in a more robust way
         pdf.Save($"output\\{name}.pdf");
         Console.WriteLine("PDF saved as ManualScan.pdf");
     }

@@ -95,6 +95,8 @@
         <div id="status"></div>
     </main>
     <script>
+        var pages = [];
+
         const cropperImage = document.getElementById('cropper-image');
         const shade = document.getElementById('shade');
         const scanBtn = document.getElementById('scanBtn');
@@ -120,12 +122,7 @@
             try {
                 const canvas = await cropperSelection.$toCanvas();
                 canvas.toBlob(async (blob) => {
-                    const formData = new FormData();
-                    formData.append('file', blob, 'cropped.bmp');
-
-                    const res = await fetch('/approve', { method: 'POST', body: formData });
-
-                    if (!res.ok) throw new Error('Upload failed');
+                    pages.push(blob);
                 })
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
@@ -209,20 +206,26 @@
         });
         finishBtn.addEventListener('click', async () => {
             try {
+                const formData = new FormData();
+
                 const name = prompt('Enter file name:');
                 if (!name) {
                     status.textContent = "No name entered.";
                     return;
                 }
 
-                const res = await fetch('/finish', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name })
-                });
-                if (!res.ok) throw new Error('Request failed: ' + res.status);
+                formData.set('filename', name);
+                console.log("pages: ", pages.length);
+
+                for (blob of pages) {
+                    formData.append('file', blob, 'cropped.bmp');
+                }
+
+                const res = await fetch('/finish2', { method: 'POST', body: formData });
+                if (!res.ok) throw new Error('Upload failed: ' + res.status);
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
+                throw err;
             }
         });
     </script>
