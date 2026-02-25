@@ -90,7 +90,6 @@
             <button id="rice" class="fakeScan">Rice</button>
         </div>
         <button id="scanBtn">Scan</button>
-        <button id="approveBtn" disabled="true">Approve</button>
         <button id="finishBtn">Finish</button>
         <div id="status"></div>
     </main>
@@ -103,7 +102,6 @@
         const finishBtn = document.getElementById('finishBtn');
         const status = document.getElementById('status');
         const spinner = document.getElementById('spinner');
-        const approveBtn = document.getElementById('approveBtn');
         const cropperCanvas = document.getElementById('cropper-canvas');
         const cropperSelection = document.getElementById('selection');
         cropperSelection.addEventListener('change', function (event) {
@@ -114,21 +112,6 @@
         // Monkey-patching hack to enable scrolling over the image
         cropperCanvas.removeEventListener('wheel', cropperCanvas.$onWheel, { capture: true });
         cropperCanvas.$onWheel = null;
-
-        approveBtn.addEventListener('click', async () => {
-
-            approveBtn.disabled = true;
-
-            try {
-                const canvas = await cropperSelection.$toCanvas();
-                canvas.toBlob(async (blob) => {
-                    pages.push(blob);
-                })
-            } catch (err) {
-                status.textContent = 'Error: ' + err.message;
-            }
-
-        });
 
 
         function init_cropper(image, width, height) {
@@ -145,8 +128,6 @@
 
         function handleImage(data) {
             const url = URL.createObjectURL(data);
-
-            approveBtn.disabled = false;
 
             var lImg = new Image();
             lImg.onload = () => {
