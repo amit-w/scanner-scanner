@@ -13,49 +13,6 @@ record UserInput(string Name);
 
 record FakeScanName(string FileName);
 
-internal class SessionState
-{
-    public void ReplaceImage(Image new_image)
-    {
-        Console.WriteLine(":: replace image");
-        currentImage = new_image;
-
-        System.Diagnostics.Debug.WriteLine($"ReplaceImage: {images.Count}+1");
-    }
-
-    public void AddCurrent()
-    {
-        images.Add(currentImage ?? throw new Exception("no current image"));
-        Console.WriteLine("AddCurrent. Length is now: " + images.Count);
-        currentImage = null;
-    }
-
-    public List<Image> Take()
-    {
-        if (currentImage != null)
-        {
-            System.Diagnostics.Debug.WriteLine($"Take: {images.Count}+1");
-
-            images.Add(currentImage);
-            currentImage = null;
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"Take: {images.Count}");
-
-        }
-
-        var retVal = images;
-        images = [];
-        return retVal;
-    }
-
-    private Image? currentImage = null;
-    private List<Image> images = [];
-
-    public int Count { get { return images.Count; } }
-}
-
 
 class NoScanner : IScanner
 {
@@ -79,9 +36,6 @@ internal class Program
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
-        //var scanner = new Scanner();
-
-        var state = new SessionState();
         //var scanner = new Scanner();
         var scanner = new NoScanner();  // TODO revert
 
@@ -114,81 +68,38 @@ internal class Program
             return;
         }
 
-        app.MapPost("/approve", [Consumes("multipart/form-data")] async (HttpContext context) =>
-        {
-            Console.WriteLine(":: approve");
-            var form = await context.Request.ReadFormAsync();
-            var file = form.Files["file"];
-
-            if (file != null)
-            {
-                using var ms = new MemoryStream();
-                await file.CopyToAsync(ms);
-
-                var image = new Bitmap(ms);
-                var image2 = new Bitmap(image);
-                state.ReplaceImage(image);
-            }
-
-            state.AddCurrent();
-            Console.WriteLine(":: /approve");
-
-            return Results.Ok();
-        });
-
         app.MapPost("/finish2", [Consumes("multipart/form-data")] async (HttpContext context) =>
         {
-            Console.WriteLine(":: finish2");
             var form = await context.Request.ReadFormAsync();
             var filename = form["filename"][0] ?? throw new Exception("no filename provided");
 
-            Console.WriteLine("amount of files: " + form.Files.Count);
-
+            var images = new List<Image>();
             using var ms = new MemoryStream();
             foreach (var file in form.Files)
             {
-                Console.WriteLine("> file");
-                ms.Seek(0, SeekOrigin.Begin);
-                await file.CopyToAsync(ms);
-
-                var image = new Bitmap(ms);
-                var image2 = new Bitmap(image);
-                // TODO remove this "state" thing
-                state.ReplaceImage(image);
-                state.AddCurrent();
+                Bitmap image = await FormFileToImage(ms, file);
+                images.Add(image);
             }
-            Console.WriteLine(state.Count);
 
-            CreatePdf(state.Take(), filename);
-            Console.WriteLine(":: /finish2");
+            CreatePdf(images, filename);
             return Results.NoContent();
 
-        });
-
-        // app.MapGet("/debug-endpoints", () =>
-        // {
-        //     var endpoints = app.Services.GetRequiredService<EndpointDataSource>().Endpoints;
-        //     var info = endpoints.Select(ep =>
-        //     {
-        //         var routePattern = (ep as RouteEndpoint)?.RoutePattern?.RawText ?? ep.DisplayName;
-        //         var metadata = ep.Metadata.Select(m => m.GetType().Name).ToList();
-        //         return new { routePattern, metadata };
-        //     });
-
-        //     return Results.Json(info);
-        // });
-
-        app.MapPost("/finish", (UserInput input) =>
-        {
-            CreatePdf(state.Take(), input.Name);
-            System.Diagnostics.Debug.WriteLine($"world hello {input.Name}");
-            return Results.NoContent();
         });
 
         // TODO use a file from APPDATA or an envvar or something like that to control url
         // TODO or even Properties/launch.json - it exists exactly for that
         //app.Urls.Add("http://...:53353");
         app.Run();
+    }
+
+    private static async Task<Bitmap> FormFileToImage(MemoryStream ms, IFormFile file)
+    {
+        ms.Seek(0, SeekOrigin.Begin);
+        await file.CopyToAsync(ms);
+
+        var image = new Bitmap(ms);
+        var image2 = new Bitmap(image);
+        return image2;
     }
 
     public static void CreatePdf(List<Image> images, string name)
