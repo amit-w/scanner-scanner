@@ -37,10 +37,6 @@
             font-size: 0.9rem;
         }
 
-        .hidden {
-            display: none;
-        }
-
         #spinner {
             margin-top: 1rem;
             border: 4px solid #f3f3f3;
@@ -66,7 +62,7 @@
 <body>
     <script src="https://unpkg.com/cropperjs@2.1.0/dist/cropper.min.js"></script>
     <main>
-        <cropper-canvas id="cropper-canvas" background class="hidden">
+        <cropper-canvas id="cropper-canvas" background hidden>
             <cropper-image id="cropper-image"></cropper-image>
             <cropper-shade id="shade"></cropper-shade>
             <cropper-selection id="selection" initial-coverage="1.0" resizable outlined>
@@ -80,7 +76,7 @@
                 <cropper-handle action="sw-resize"></cropper-handle>
             </cropper-selection>
         </cropper-canvas>
-        <div id="spinner" class="hidden"></div>
+        <div id="spinner" hidden></div>
         <p></p>
         <div style="border-width:2px;border-color:black;border-style:solid">
             <button id="scan1" class="fakeScan">Scan (1)</button>
@@ -90,6 +86,10 @@
             <button id="rice" class="fakeScan">Rice</button>
         </div>
         <button id="scanBtn">Scan</button>
+        <button id="duplicateBtn" title="Another page with the same scan" disabled>Duplicate</button>
+        <button id="discardBtn" title="Discard current scan" disabled>Discard</button>
+        <!-- TODO maybe disable the finish button until there is at least one page -->
+        <!--   cont. (but note that after the first scan it should be enabled (since there is no approve), therefore discard should disable it if `pages` is empty)-->
         <button id="finishBtn">Finish</button>
         <div id="status"></div>
     </main>
@@ -100,12 +100,13 @@
         const shade = document.getElementById('shade');
         const scanBtn = document.getElementById('scanBtn');
         const finishBtn = document.getElementById('finishBtn');
+        const duplicateBtn = document.getElementById('duplicateBtn');
+        const discardBtn = document.getElementById('discardBtn');
         const status = document.getElementById('status');
         const spinner = document.getElementById('spinner');
         const cropperCanvas = document.getElementById('cropper-canvas');
         const cropperSelection = document.getElementById('selection');
         cropperSelection.addEventListener('change', function (event) {
-            shade.hidden = false;
             shade.$change(event.detail.x, event.detail.y, event.detail.width, event.detail.height);
         });
 
@@ -113,16 +114,42 @@
         cropperCanvas.removeEventListener('wheel', cropperCanvas.$onWheel, { capture: true });
         cropperCanvas.$onWheel = null;
 
+        async function addImage() {
+            const canvas = await cropperSelection.$toCanvas();
+            canvas.toBlob(async (blob) => {
+                pages.push(blob);
+            });
+        }
 
-        function init_cropper(image, width, height) {
-            console.log(`init_cropper: width:height = ${width}:${height}`);
-            shade.$change(0, 0, width, height);
-            cropperSelection.$change(0, 0, width, height);
-            cropperImage.src = image;
+        function emptyCanvas() {
+            cropperCanvas.hidden = true;
 
-            cropperCanvas.classList.remove('hidden');
-            cropperCanvas.style.width = `${width}px`;
-            cropperCanvas.style.height = `${height}px`;
+            discardBtn.disabled = true;
+            duplicateBtn.disabled = true;
+        }
+
+        async function initCropper(image, width, height) {
+            // If there is currently an image
+            if (!cropperCanvas.hidden) {
+                await addImage();
+            }
+
+            try {
+                console.log(`initCropper: width:height = ${width}:${height}`);
+                shade.$change(0, 0, width, height);
+                cropperSelection.$change(0, 0, width, height);
+                cropperImage.src = image;
+
+                cropperCanvas.style.width = `${width}px`;
+                cropperCanvas.style.height = `${height}px`;
+                cropperCanvas.hidden = false;
+
+                discardBtn.disabled = false;
+                duplicateBtn.disabled = false;
+            } catch (err) {
+                emptyCanvas();
+                throw err;
+            }
         }
 
 
@@ -130,7 +157,7 @@
             const url = URL.createObjectURL(data);
 
             var lImg = new Image();
-            lImg.onload = () => {
+            lImg.onload = async () => {
                 const margin = 20;
                 const maxWidth = document.documentElement.clientWidth - margin;
                 console.log("maxWidth: ", maxWidth);
@@ -139,7 +166,7 @@
                 const height = lImg.naturalWidth * scale;
                 console.log('handleImage::onload: width:', width, 'height:', height);
 
-                init_cropper(url, width, height);
+                await initCropper(url, width, height);
             }
             lImg.src = url;
         }
@@ -167,7 +194,7 @@
         }
 
         scanBtn.addEventListener('click', async () => {
-            spinner.classList.remove('hidden');
+            spinner.hidden = false;
             status.textContent = 'Waiting for scan...';
 
             try {
@@ -181,11 +208,27 @@
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
             } finally {
-                spinner.classList.add('hidden');
+                spinner.hidden = true;
                 status.textContent = null;
             }
         });
+
+        duplicateBtn.addEventListener('click', async () => {
+            await addImage();
+        });
+
+        discardBtn.addEventListener('click', () => {
+            emptyCanvas();
+        });
+
+
         finishBtn.addEventListener('click', async () => {
+            // If there is currently a scan, we want to include it
+            if (!cropperCanvas.hidden) {
+                await addImage();
+                emptyCanvas();
+            }
+
             try {
                 const formData = new FormData();
 
