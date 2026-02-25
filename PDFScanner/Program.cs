@@ -81,22 +81,10 @@ internal class Program
 
         //var scanner = new Scanner();
 
-        // Serve a single HTML page at "/"
-        //app.MapGet("/", async context =>
-        //{
-
-        //    context.Response.ContentType = "text/html; charset=utf-8";
-        //    await context.Response.WriteAsync(html);
-        //});
-
-        //Bitmap currentImage = null;
-        //var images = new List<Bitmap>();
-
         var state = new SessionState();
         //var scanner = new Scanner();
         var scanner = new NoScanner();  // TODO revert
 
-        // Endpoint that prints to stdout
         app.MapPost("/scan", async (HttpContext context) =>
         {
             var image = scanner.ScanPage() ?? throw new Exception("image was null");
@@ -118,8 +106,6 @@ internal class Program
             using var ms = new MemoryStream();
             bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Bmp);
             var rawImage = ms.ToArray();
-
-            // state.ReplaceImage(bitmap);
 
             context.Response.ContentType = "image/json";
             await context.Response.Body.WriteAsync(rawImage);
