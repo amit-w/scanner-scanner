@@ -1,13 +1,10 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
+﻿using System.Drawing;
+using System.IO;
+
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Hosting;
+
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
-using System.Drawing;
-using System.IO;
-using Windows.UI.WebUI;
-using static PdfSharp.Capabilities.Features;
 
 record UserInput(string Name);
 
@@ -36,7 +33,7 @@ internal class Program
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
-        //var scanner = new Scanner();
+        // var scanner = new Scanner();
         var scanner = new NoScanner();  // TODO revert
 
         app.MapPost("/scan", async (HttpContext context) =>
