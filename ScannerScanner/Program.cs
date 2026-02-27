@@ -33,8 +33,7 @@ internal class Program
         app.UseDefaultFiles();
         app.UseStaticFiles();
 
-        // var scanner = new Scanner();
-        var scanner = new NoScanner();  // TODO revert
+        var scanner = new Scanner();
 
         app.MapPost("/scan", async (HttpContext context) =>
         {
