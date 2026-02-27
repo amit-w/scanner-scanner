@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # 17
 VisualStudioVersion = 17.11.35219.272
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDFScanner", "PDFScanner\PDFScanner.csproj", "{F9569D3E-DA3D-49A4-A1DE-1C57D74126E1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScannerScanner", "ScannerScanner\ScannerScanner.csproj", "{F9569D3E-DA3D-49A4-A1DE-1C57D74126E1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
